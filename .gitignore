@@ -1,0 +1,21 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Secrets: কখনো commit নয়
+.env
+
+# Local files
+cookies*.txt
+*.log
+db.sqlite3
+
+# Django
+staticfiles/
+media/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
