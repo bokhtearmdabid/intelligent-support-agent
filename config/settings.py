@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     # Our apps
     'accounts',
     'shop',
+    'support',
 ]
 
 MIDDLEWARE = [
@@ -134,6 +135,7 @@ REST_FRAMEWORK = {
         "login": "5/min",
         "anon": "30/min",
         "user": "120/min",
+        "chat": "10/min",
     },
 }
 
@@ -163,4 +165,26 @@ MAILERS = {
     'default': {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
+}
+
+
+# ---- LLM ----
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "google_genai")
+LLM_MODEL = os.getenv("LLM_MODEL", "")
+_temp = os.getenv("LLM_TEMPERATURE", "0.2").strip()
+LLM_TEMPERATURE = float(_temp) if _temp else None   
+LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "30"))
+LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "700"))
+
+# ---- Chat ----
+CHAT_HISTORY_LIMIT = 20         
+CHAT_MESSAGE_MAX_CHARS = 2000
+
+# ---- Logging ----
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {"support": {"handlers": ["console"], "level": "INFO"}},
 }
