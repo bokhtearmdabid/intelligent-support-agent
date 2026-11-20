@@ -12,9 +12,11 @@ class FakeModel:
         self.response = response
         self.error = error
         self.calls = []
+        self.kwargs = []
 
-    def invoke(self, messages):
+    def invoke(self, messages, **kwargs):
         self.calls.append(messages)
+        self.kwargs.append(kwargs)
         if self.error:
             raise self.error
         return self.response

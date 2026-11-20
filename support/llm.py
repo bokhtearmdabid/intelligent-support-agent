@@ -6,6 +6,7 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from django.conf import settings
 
 from .prompts import PROMPT_VERSION, SYSTEM_PROMPT
 
@@ -60,32 +61,37 @@ def _extract_text(content) -> str:
 
 def generate_reply(history, user_message) -> LLMResult:
     """history: [(role, content), ...] পুরনো থেকে নতুন ক্রমে।"""
+
     messages = [SystemMessage(content=SYSTEM_PROMPT)]
+
     for role, content in history:
         if role == "user":
             messages.append(HumanMessage(content=content))
         else:
             messages.append(AIMessage(content=content))
-    messages.append(HumanMessage(content=user_message))   # শুধুই HumanMessage
 
-    model = get_chat_model()   # কনফিগ-ভুল এখানে জোরে ব্যর্থ হবে (৫০০)
+    messages.append(HumanMessage(content=user_message))
+
+    model = get_chat_model()
 
     try:
         response = model.invoke(
-        messages,
-        timeout=60,
-    )
+            messages,
+            timeout=settings.LLM_TIMEOUT
+        )
 
     except Exception as exc:
         logger.exception("LLM call failed")
         raise LLMUnavailable from exc
 
     text = _extract_text(response.content)
+
     if not text:
         logger.error("LLM returned an empty response")
         raise LLMUnavailable("empty response")
 
     usage = getattr(response, "usage_metadata", None) or {}
+
     return LLMResult(
         text=text,
         model_name=settings.LLM_MODEL,

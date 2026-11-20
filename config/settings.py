@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.postgres',
 
     # Third-party
     'rest_framework',
@@ -49,6 +50,7 @@ INSTALLED_APPS = [
     'accounts',
     'shop',
     'support',
+    'knowledge',
 ]
 
 MIDDLEWARE = [
@@ -188,3 +190,10 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "loggers": {"support": {"handlers": ["console"], "level": "INFO"}},
 }
+
+# ---- RAG ----
+KNOWLEDGE_DIR = BASE_DIR / "knowledge_base"
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
+EMBEDDING_DIMENSIONS = 768   # DB column-এর সাথে বাঁধা: বদলাতে migration + সব নতুন করে embed
+RAG_CHUNK_SIZE = 700
+RAG_CHUNK_OVERLAP = 100
