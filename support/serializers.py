@@ -14,7 +14,7 @@ class ChatRequestSerializer(serializers.Serializer):
 class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChatMessage
-        fields = ("role", "content", "created_at")
+        fields = ("role", "content", "created_at", "sources")
         read_only_fields = fields
 
 

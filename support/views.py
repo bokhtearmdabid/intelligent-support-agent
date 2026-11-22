@@ -8,6 +8,7 @@ from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from .llm import LLMUnavailable, generate_reply
 from .models import SupportConversation
+from .rag import retrieve_context, sources_for_api
 from .serializers import (
     ChatRequestSerializer,
     ConversationDetailSerializer,
@@ -41,11 +42,15 @@ class ChatView(APIView):
                 )
             except SupportConversation.DoesNotExist:
                 raise NotFound()   # অন্যেরটা আর অস্তিত্বহীন: একই উত্তর
+            # ↓ এই লাইন অবশ্যই if-এর ভেতরে (১২ স্পেস)
             history = recent_history(conversation, settings.CHAT_HISTORY_LIMIT)
+
+        # মালিকানা যাচাই শেষ: এখন বাইরের API (embedding, LLM) ডাকা নিরাপদ
+        context = retrieve_context(history, message)
 
         # ধীর কাজ: কোনো DB transaction খোলা নেই
         try:
-            result = generate_reply(history, message)
+            result = generate_reply(history, message, context=context)
         except LLMUnavailable:
             return Response(
                 {"detail": "The assistant is temporarily unavailable. "
@@ -53,9 +58,15 @@ class ChatView(APIView):
                 status=503,
             )
 
-        conversation = save_exchange(request.user, conversation, message, result)
+        sources = sources_for_api(context)
+        conversation = save_exchange(
+            request.user, conversation, message, result,
+            sources=sources, retrieval_status=context.status,
+        )
         return Response(
-            {"conversation_id": conversation.public_id, "reply": result.text},
+            {"conversation_id": conversation.public_id,
+             "reply": result.text,
+             "sources": sources},
             status=201,
         )
 

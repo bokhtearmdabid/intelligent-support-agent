@@ -4,11 +4,11 @@ from functools import lru_cache
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from django.conf import settings
 
-from .prompts import PROMPT_VERSION, SYSTEM_PROMPT
+from .prompts import PROMPT_VERSION, SYSTEM_PROMPT, render_user_turn
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,7 @@ def get_chat_model():
         "max_retries": settings.LLM_MAX_RETRIES,
         "max_tokens": settings.LLM_MAX_TOKENS,
     }
+
     if settings.LLM_TEMPERATURE is not None:
         kwargs["temperature"] = settings.LLM_TEMPERATURE
 
@@ -48,19 +49,24 @@ def get_chat_model():
 
 def _extract_text(content) -> str:
     """উত্তর কখনো স্ট্রিং, কখনো ব্লকের তালিকা: দুটোই সামলাই।"""
+
     if isinstance(content, str):
         return content.strip()
+
     parts = []
+
     for block in content or []:
         if isinstance(block, str):
             parts.append(block)
+
         elif isinstance(block, dict) and block.get("type") == "text":
             parts.append(block.get("text", ""))
+
     return "".join(parts).strip()
 
 
-def generate_reply(history, user_message) -> LLMResult:
-    """history: [(role, content), ...] পুরনো থেকে নতুন ক্রমে।"""
+def generate_reply(history, user_message, context=None) -> LLMResult:
+    """history: [(role, content), ...]; context: RagContext বা None।"""
 
     messages = [SystemMessage(content=SYSTEM_PROMPT)]
 
@@ -70,14 +76,20 @@ def generate_reply(history, user_message) -> LLMResult:
         else:
             messages.append(AIMessage(content=content))
 
-    messages.append(HumanMessage(content=user_message))
+    final_turn = (
+        render_user_turn(user_message, context)
+        if context is not None
+        else user_message
+    )
 
-    model = get_chat_model()
+    messages.append(HumanMessage(content=final_turn))
 
     try:
+        model = get_chat_model()
+
         response = model.invoke(
             messages,
-            timeout=settings.LLM_TIMEOUT
+            timeout=settings.LLM_TIMEOUT,
         )
 
     except Exception as exc:
