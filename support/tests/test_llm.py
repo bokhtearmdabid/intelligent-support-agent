@@ -5,6 +5,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from support import llm
 from support.llm import LLMUnavailable, generate_reply
+from support.prompts import PROMPT_VERSION
 
 
 class FakeModel:
@@ -61,7 +62,7 @@ class GenerateReplyTests(SimpleTestCase):
             result = generate_reply([], "hello")
         self.assertEqual(result.text, "Hi")
         self.assertEqual((result.input_tokens, result.output_tokens), (10, 5))
-        self.assertEqual(result.prompt_version, "v1")
+        self.assertEqual(result.prompt_version, PROMPT_VERSION)
 
     def test_content_blocks_are_flattened(self):
         response = AIMessage(content=[{"type": "text", "text": "Part A. "},

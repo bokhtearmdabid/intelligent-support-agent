@@ -197,3 +197,5 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
 EMBEDDING_DIMENSIONS = 768   # DB column-এর সাথে বাঁধা: বদলাতে migration + সব নতুন করে embed
 RAG_CHUNK_SIZE = 700
 RAG_CHUNK_OVERLAP = 100
+RAG_TOP_K = 4
+RAG_MAX_DISTANCE = float(os.getenv("RAG_MAX_DISTANCE", "0.35"))

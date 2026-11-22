@@ -7,8 +7,10 @@ from accounts.models import Customer
 from support.llm import LLMResult, LLMUnavailable
 from support.models import ChatMessage, SupportConversation
 from support.services import recent_history
+from support.rag import RagContext
 
 GENERATE = "support.views.generate_reply"
+RETRIEVE = "support.views.retrieve_context"
 
 
 def fake_result(text="Hello from Aria"):
@@ -24,6 +26,9 @@ class ChatApiTests(APITestCase):
 
     def setUp(self):
         cache.clear()
+        patcher = patch(RETRIEVE, return_value=RagContext("empty"))
+        self.retrieve = patcher.start()
+        self.addCleanup(patcher.stop)
 
     # ---------- Authentication ----------
     def test_anonymous_cannot_chat(self):
@@ -31,6 +36,7 @@ class ChatApiTests(APITestCase):
             response = self.client.post("/api/chat/", {"message": "hi"}, format="json")
         self.assertEqual(response.status_code, 403)
         gen.assert_not_called()
+        self.retrieve.assert_not_called()
 
     def test_csrf_is_enforced_for_session_auth(self):
         client = APIClient(enforce_csrf_checks=True)
@@ -39,6 +45,7 @@ class ChatApiTests(APITestCase):
             response = client.post("/api/chat/", {"message": "hi"}, format="json")
         self.assertEqual(response.status_code, 403)
         gen.assert_not_called()
+        self.retrieve.assert_not_called()
 
     # ---------- Happy path ----------
     def test_new_conversation_is_created_and_saved(self):
@@ -84,6 +91,7 @@ class ChatApiTests(APITestCase):
             )
         self.assertEqual(response.status_code, 404)
         gen.assert_not_called()          # কোনো খরচ নয়, কোনো ফাঁস নয়
+        self.retrieve.assert_not_called()
         self.assertEqual(conv.messages.count(), 0)
 
     # ---------- Validation ----------
@@ -101,6 +109,7 @@ class ChatApiTests(APITestCase):
                 response = self.client.post("/api/chat/", payload, format="json")
                 self.assertEqual(response.status_code, 400, payload)
         gen.assert_not_called()
+        self.retrieve.assert_not_called()
 
     # ---------- Failure handling ----------
     def test_llm_failure_returns_503_and_saves_nothing(self):

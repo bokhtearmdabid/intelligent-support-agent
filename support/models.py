@@ -44,6 +44,8 @@ class ChatMessage(models.Model):
     # শুধু assistant মেসেজে; customer-কে দেখানো হয় না
     model_name = models.CharField(max_length=100, blank=True)
     prompt_version = models.CharField(max_length=20, blank=True)
+    sources = models.JSONField(default=list, blank=True)
+    retrieval_status = models.CharField(max_length=12, blank=True)
     input_tokens = models.PositiveIntegerField(null=True, blank=True)
     output_tokens = models.PositiveIntegerField(null=True, blank=True)
 
