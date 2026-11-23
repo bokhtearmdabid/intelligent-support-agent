@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
+from .tools import build_tools
 
 from .llm import LLMUnavailable, generate_reply
 from .models import SupportConversation
@@ -42,15 +43,17 @@ class ChatView(APIView):
                 )
             except SupportConversation.DoesNotExist:
                 raise NotFound()   # অন্যেরটা আর অস্তিত্বহীন: একই উত্তর
-            # ↓ এই লাইন অবশ্যই if-এর ভেতরে (১২ স্পেস)
             history = recent_history(conversation, settings.CHAT_HISTORY_LIMIT)
 
-        # মালিকানা যাচাই শেষ: এখন বাইরের API (embedding, LLM) ডাকা নিরাপদ
+        # মালিকানা যাচাই শেষ: এখন বাইরের API ডাকা নিরাপদ
         context = retrieve_context(history, message)
 
-        # ধীর কাজ: কোনো DB transaction খোলা নেই
         try:
-            result = generate_reply(history, message, context=context)
+            result = generate_reply(
+                history, message,
+                context=context,
+                tools=build_tools(request.user),    # ← এই request-এর user-এ বাঁধা
+            )
         except LLMUnavailable:
             return Response(
                 {"detail": "The assistant is temporarily unavailable. "
@@ -62,6 +65,7 @@ class ChatView(APIView):
         conversation = save_exchange(
             request.user, conversation, message, result,
             sources=sources, retrieval_status=context.status,
+            tool_trace=result.tool_trace,
         )
         return Response(
             {"conversation_id": conversation.public_id,
