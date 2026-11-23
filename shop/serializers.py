@@ -112,3 +112,18 @@ class OrderStatusSerializer(serializers.ModelSerializer):
     def get_payment_status(self, obj):
         payments = list(obj.payments.all())   # Meta ordering: নতুনটা আগে
         return payments[0].status if payments else None
+
+class AgentPaymentSerializer(PaymentSerializer):
+    class Meta(PaymentSerializer.Meta):
+        fields = ("method", "status", "amount", "paid_at")   # transaction id একেবারেই নেই
+        read_only_fields = fields
+
+
+class AgentOrderDetailSerializer(OrderDetailSerializer):
+    payments = AgentPaymentSerializer(many=True, read_only=True)
+
+    class Meta(OrderDetailSerializer.Meta):
+        fields = tuple(
+            f for f in OrderDetailSerializer.Meta.fields if f != "shipping_address"
+        )
+        read_only_fields = fields

@@ -46,6 +46,7 @@ class ChatMessage(models.Model):
     prompt_version = models.CharField(max_length=20, blank=True)
     sources = models.JSONField(default=list, blank=True)
     retrieval_status = models.CharField(max_length=12, blank=True)
+    tool_calls = models.JSONField(default=list, blank=True)
     input_tokens = models.PositiveIntegerField(null=True, blank=True)
     output_tokens = models.PositiveIntegerField(null=True, blank=True)
 
