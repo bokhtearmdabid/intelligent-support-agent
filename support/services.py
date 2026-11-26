@@ -25,7 +25,7 @@ def recent_history(conversation, limit):
 
 @transaction.atomic
 def save_exchange(user, conversation, user_text, result, *,
-                  sources=(), retrieval_status="", tool_trace=()):
+                  sources=(), retrieval_status="", tool_trace=(), intent=""):
     if conversation is None:
         conversation = SupportConversation.objects.create(
             customer=user, title=user_text[:80]
@@ -46,6 +46,7 @@ def save_exchange(user, conversation, user_text, result, *,
         sources=list(sources),
         retrieval_status=retrieval_status,
         tool_calls=list(tool_trace),
+        intent=intent,
     )
     conversation.save(update_fields=["updated_at"])
     return conversation

@@ -49,6 +49,7 @@ class ChatMessage(models.Model):
     tool_calls = models.JSONField(default=list, blank=True)
     input_tokens = models.PositiveIntegerField(null=True, blank=True)
     output_tokens = models.PositiveIntegerField(null=True, blank=True)
+    intent = models.CharField(max_length=12, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

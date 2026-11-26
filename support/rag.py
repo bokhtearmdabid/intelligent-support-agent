@@ -25,14 +25,18 @@ def build_retrieval_query(history, message):
     return message[:MAX_QUERY_CHARS]
 
 
-def retrieve_context(history, message):
-    query = build_retrieval_query(history, message)
+def retrieve_for_query(query):
+    """তৈরি-করা একটা প্রশ্নের জন্য খোঁজা: গ্রাফের retrieve node এটাই ডাকে।"""
     try:
         chunks = search_knowledge(query)
     except EmbeddingError:
         logger.warning("Knowledge search unavailable; answering without excerpts")
         return RagContext("unavailable")
     return RagContext("ok" if chunks else "empty", tuple(chunks))
+
+
+def retrieve_context(history, message):
+    return retrieve_for_query(build_retrieval_query(history, message))
 
 
 def sources_for_api(context):

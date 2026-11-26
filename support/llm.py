@@ -26,6 +26,9 @@ class LLMResult:
     input_tokens: int | None = None
     output_tokens: int | None = None
     tool_trace: tuple = ()
+    sources: tuple = ()
+    retrieval_status: str = ""
+    intent: str = ""
 
 
 @lru_cache(maxsize=1)
@@ -49,7 +52,7 @@ def get_chat_model():
     )
 
 
-def _extract_text(content) -> str:
+def extract_text(content) -> str:
     """উত্তর কখনো স্ট্রিং, কখনো ব্লকের তালিকা: দুটোই সামলাই।"""
 
     if isinstance(content, str):
@@ -98,6 +101,29 @@ def _run_tool(tools_by_name, call):
         ok = True
     return text, ok
 
+def execute_tool_calls(tools_by_name, calls):
+    """এক রাউন্ডের সব tool call চালায়। ফেরত: (ToolMessage-এর তালিকা, trace-এর তালিকা)।
+
+    সীমার বাইরের call-ও ToolMessage পায় (Gemini প্রতিটা call-এর উত্তর চায়), কিন্তু চলে না।
+    """
+    messages, trace = [], []
+    for index, call in enumerate(calls):
+        if index >= MAX_CALLS_PER_ROUND:
+            content = _error_json("too_many_tool_calls", "Too many tool calls at once.")
+            ok = False
+        else:
+            content, ok = _run_tool(tools_by_name, call)
+        trace.append({
+            "tool": str(call.get("name")),
+            "args": json.dumps(call.get("args") or {}, ensure_ascii=False, default=str)[:TRACE_ARGS_CHARS],
+            "ok": ok,
+        })
+        messages.append(ToolMessage(
+            content=content,
+            tool_call_id=call.get("id") or "",
+            name=call.get("name") or "",
+        ))
+    return messages, trace
 
 def generate_reply(history, user_message, context=None, tools=None) -> LLMResult:
     """history: [(role, content), ...]; context: RagContext বা None; tools: build_tools(user)।"""
@@ -139,30 +165,15 @@ def generate_reply(history, user_message, context=None, tools=None) -> LLMResult
         calls = list(getattr(response, "tool_calls", None) or [])
         if not calls:
             break                                   # চূড়ান্ত উত্তর
-
-        messages.append(response)                   # LLM-এর মূল AIMessage হুবহু (Gemini-র signature সহ)
-        for index, call in enumerate(calls):
-            if index >= MAX_CALLS_PER_ROUND:
-                content = _error_json("too_many_tool_calls", "Too many tool calls at once.")
-                ok = False
-            else:
-                content, ok = _run_tool(tools_by_name, call)
-            trace.append({
-                "tool": str(call.get("name")),
-                "args": json.dumps(call.get("args") or {}, ensure_ascii=False, default=str)[:TRACE_ARGS_CHARS],
-                "ok": ok,
-            })
-            # প্রতিটা call-এর একটা করে ToolMessage লাগবেই, নইলে Gemini ত্রুটি দেয়
-            messages.append(ToolMessage(
-                content=content,
-                tool_call_id=call.get("id") or "",
-                name=call.get("name") or "",
-            ))
+        messages.append(response)                   # LLM-এর মূল AIMessage হুবহু
+        tool_messages, round_trace = execute_tool_calls(tools_by_name, calls)
+        messages.extend(tool_messages)
+        trace.extend(round_trace)
     else:
         logger.error("Tool loop did not finish after %s rounds", MAX_TOOL_ROUNDS)
         raise LLMUnavailable("tool loop limit reached")
 
-    text = _extract_text(response.content)
+    text = extract_text(response.content)
     if not text:
         logger.error("LLM returned an empty response")
         raise LLMUnavailable("empty response")
@@ -174,4 +185,5 @@ def generate_reply(history, user_message, context=None, tools=None) -> LLMResult
         input_tokens=in_total if saw_usage else None,
         output_tokens=out_total if saw_usage else None,
         tool_trace=tuple(trace),
+
     )
