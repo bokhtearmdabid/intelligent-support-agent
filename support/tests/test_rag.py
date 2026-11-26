@@ -119,29 +119,26 @@ class ChatRagApiTests(APITestCase):
         cache.clear()
         self.client.force_authenticate(self.user)
 
-    def _post(self, context):
-        result = LLMResult(text="answer", model_name="m", prompt_version="v2")
-        with patch("support.views.retrieve_context", return_value=context), \
-             patch("support.views.generate_reply", return_value=result) as gen:
+    def _post(self, result):
+        with patch("support.views.run_agent", return_value=result) as run:
             response = self.client.post("/api/chat/", {"message": "hi"}, format="json")
-        return response, gen
+        return response, run
 
     def test_sources_are_returned_and_stored_without_internal_details(self):
-        response, gen = self._post(RagContext("ok", (chunk(d=0.31),)))
+        sources = ({"document": "Returns and Refunds Policy", "section": "Refund timeline"},)
+        result = LLMResult(text="answer", model_name="m", prompt_version="v4",
+                           sources=sources, retrieval_status="ok", intent="policy")
+        response, run = self._post(result)
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(
-            response.data["sources"],
-            [{"document": "Returns and Refunds Policy", "section": "Refund timeline"}],
-        )
-        self.assertNotIn("0.31", response.content.decode())
-        self.assertEqual(gen.call_args.kwargs["context"].status, "ok")
+        self.assertEqual(response.data["sources"], list(sources))
+        self.assertNotIn("distance", response.content.decode())
 
         saved = ChatMessage.objects.get(role="assistant")
-        self.assertEqual(saved.retrieval_status, "ok")
-        self.assertEqual(saved.sources, response.data["sources"])
+        self.assertEqual((saved.retrieval_status, saved.intent), ("ok", "policy"))
+        self.assertEqual(saved.sources, list(sources))
+        self.assertEqual(run.call_args.args[0], self.user)
 
-    def test_unavailable_knowledge_still_answers(self):
-        response, gen = self._post(RagContext("unavailable"))
+    def test_answer_without_sources_still_works(self):
+        response, _ = self._post(LLMResult(text="hello", prompt_version="v4"))
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["sources"], [])
-        self.assertEqual(gen.call_args.kwargs["context"].status, "unavailable")
